@@ -3,7 +3,7 @@
 A native, e-ink-first Android client for [Audiobookshelf](https://www.audiobookshelf.org/),
 built for the Mudita Kompakt.
 
-This is a fresh client, not a fork of the Audiobookshelf web app It speaks the Audiobookshelf
+This is a fresh client, not a fork of the Audiobookshelf web app. It speaks the Audiobookshelf
 REST API directly.
 
 ## Build
