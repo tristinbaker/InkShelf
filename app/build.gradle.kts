@@ -24,11 +24,24 @@ android {
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }
 
+    // Passwords come from the environment so they never reach the repository.
+    // An unset variable degrades to an empty string, which fails the signing
+    // task loudly rather than quietly emitting an unsigned release.
+    signingConfigs {
+        create("release") {
+            storeFile = file("${System.getProperty("user.home")}/.android/defide-release.jks")
+            storePassword = System.getenv("DEFIDE_STORE_PASSWORD") ?: ""
+            keyAlias = "defide"
+            keyPassword = System.getenv("DEFIDE_KEY_PASSWORD") ?: ""
+        }
+    }
+
     buildTypes {
         debug {
             isMinifyEnabled = false
         }
         release {
+            signingConfig = signingConfigs.getByName("release")
             isMinifyEnabled = true
             isShrinkResources = true
             proguardFiles(
