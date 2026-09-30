@@ -1,0 +1,17 @@
+*.iml
+.gradle/
+.kotlin/
+local.properties
+.idea/
+build/
+captures/
+.externalNativeBuild/
+.cxx/
+*.apk
+*.keystore
+!debug.keystore
+.DS_Store
+
+# uiautomator dumps from device debugging
+*.xml.bak
+uiautomator*.xml
