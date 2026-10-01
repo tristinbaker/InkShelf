@@ -119,6 +119,11 @@ data class AppState(
     val message: String? = null,
     val busy: Boolean = false,
     val book: LibraryItem? = null,
+    /**
+     * The list a book was opened from, so Back returns to that exact screen
+     * (and, for the browse list, the same scroll position) rather than guessing.
+     */
+    val bookOrigin: Route = Route.Libraries,
     val itemsTitle: String = "",
     val player: PlayerState = PlayerState(),
     val downloads: Map<String, DownloadSummary> = emptyMap(),
@@ -205,7 +210,11 @@ class AppViewModel(private val locator: ServiceLocator) : ViewModel() {
 
     /** Opens a book straight from its cached description, never asking the server. */
     fun openDownloadedBook(itemId: String) {
-        _ui.value = _ui.value.copy(route = Route.Book(itemId), busy = true)
+        _ui.value = _ui.value.copy(
+            route = Route.Book(itemId),
+            bookOrigin = Route.Downloaded,
+            busy = true,
+        )
         viewModelScope.launch {
             val cached = cachedBook(itemId)
             _ui.value = _ui.value.copy(busy = false, book = cached)
@@ -490,8 +499,8 @@ class AppViewModel(private val locator: ServiceLocator) : ViewModel() {
                             error = "Showing saved copy. ${result.message}",
                             fromCache = true,
                             items = Sorters.sortedItems(cached, order, descending),
-                            authors = cached.distinctAuthors(),
-                            series = cached.distinctSeries(),
+                            authors = cached.distinctAuthors().inDirection(descending),
+                            series = cached.distinctSeries().inDirection(descending),
                             totalOnServer = cached.size,
                         ),
                     )
@@ -529,7 +538,7 @@ class AppViewModel(private val locator: ServiceLocator) : ViewModel() {
                     loading = false,
                     error = "Showing saved copy. ${result.message}",
                     fromCache = true,
-                    series = cached.distinctSeries(),
+                    series = cached.distinctSeries().inDirection(descending),
                 ),
             )
 
@@ -548,7 +557,7 @@ class AppViewModel(private val locator: ServiceLocator) : ViewModel() {
                 _ui.value = _ui.value.copy(
                     browse = _ui.value.browse.copy(
                         loading = false,
-                        series = rows.sortedWith { a, b -> a.compare(b) },
+                        series = rows.sortedWith { a, b -> a.compare(b) }.inDirection(descending),
                         error = null,
                         fromCache = false,
                         totalOnServer = rows.size,
@@ -566,7 +575,7 @@ class AppViewModel(private val locator: ServiceLocator) : ViewModel() {
                     loading = false,
                     error = "Showing saved copy. ${result.message}",
                     fromCache = true,
-                    authors = cached.distinctAuthors(),
+                    authors = cached.distinctAuthors().inDirection(descending),
                 ),
             )
 
@@ -575,7 +584,7 @@ class AppViewModel(private val locator: ServiceLocator) : ViewModel() {
                 _ui.value = _ui.value.copy(
                     browse = _ui.value.browse.copy(
                         loading = false,
-                        authors = rows.sortedWith { a, b -> a.compare(b) },
+                        authors = rows.sortedWith { a, b -> a.compare(b) }.inDirection(descending),
                         error = null,
                         fromCache = false,
                         totalOnServer = rows.size,
@@ -747,7 +756,11 @@ class AppViewModel(private val locator: ServiceLocator) : ViewModel() {
     // ---- book detail, playback & downloads -------------------------------
 
     fun openBook(item: ItemEntity) {
-        _ui.value = _ui.value.copy(route = Route.Book(item.id), busy = true)
+        _ui.value = _ui.value.copy(
+            route = Route.Book(item.id),
+            bookOrigin = originFor(_ui.value.route),
+            busy = true,
+        )
         refreshBook(item.id)
     }
 
@@ -823,12 +836,17 @@ class AppViewModel(private val locator: ServiceLocator) : ViewModel() {
     }
 
     fun backFromBook() {
-        val fromShelf = _ui.value.route == Route.Downloaded ||
-            _ui.value.downloaded.any { it.itemId == _ui.value.book?.id }
-        _ui.value = _ui.value.copy(
-            route = if (fromShelf) Route.Downloaded else Route.Items(_ui.value.itemsTitle),
-            book = null,
-        )
+        _ui.value = _ui.value.copy(route = _ui.value.bookOrigin, book = null)
+    }
+
+    /**
+     * Only the lists a book can be opened from count as an origin. Anything else
+     * (Settings, say, when the mini player is tapped there) falls back to the
+     * browse list rather than sending Back from a book somewhere unrelated.
+     */
+    private fun originFor(route: Route): Route = when (route) {
+        Route.Libraries, Route.Downloaded, is Route.Items -> route
+        else -> Route.Libraries
     }
 
     /**
@@ -857,7 +875,11 @@ class AppViewModel(private val locator: ServiceLocator) : ViewModel() {
     }
 
     fun openPlayer() {
-        if (_ui.value.player.hasBook) _ui.value = _ui.value.copy(route = Route.Player)
+        if (!_ui.value.player.hasBook) return
+        // From the mini player, the book page behind the player has to lead back
+        // to the screen the listener was actually on.
+        val origin = if (_ui.value.route is Route.Book) _ui.value.bookOrigin else originFor(_ui.value.route)
+        _ui.value = _ui.value.copy(route = Route.Player, bookOrigin = origin)
     }
 
     fun backFromPlayer() {
@@ -1043,6 +1065,14 @@ internal fun List<AuthorEntry>.toAuthorRows(): List<AuthorRow> =
         .filter { it.name.isNotEmpty() }
         .filter { it.bookCount > 0 }
         .distinctBy { it.serverId }
+
+/**
+ * Author and series rows are always sorted ascending by name locally, because
+ * the server's `desc` flag applies to its own sort key (book count, for
+ * authors), not the name order shown here. Z-A is applied on top.
+ */
+internal fun <T> List<T>.inDirection(descending: Boolean): List<T> =
+    if (descending) reversed() else this
 
 internal fun List<ItemEntity>.distinctAuthors(): List<AuthorRow> =
     mapNotNull { item ->

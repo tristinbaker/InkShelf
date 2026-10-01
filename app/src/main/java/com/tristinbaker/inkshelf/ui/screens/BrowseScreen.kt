@@ -3,6 +3,7 @@ package com.tristinbaker.inkshelf.ui.screens
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -260,6 +261,16 @@ private fun barColors(selected: Boolean): ButtonColors =
 private fun barBorder(selected: Boolean): BorderStroke? =
     if (selected) BorderStroke(2.dp, GrayRamp.g0) else null
 
+/**
+ * MMD's default horizontal padding is sized for a lone button. Four of them
+ * across a 354dp panel left "Author" about 60dp for its text, so it wrapped to
+ * "Autho / r". The label only needs a hairline of clearance from the outline.
+ */
+private val OrderBarPadding = PaddingValues(
+    horizontal = 4.dp,
+    vertical = ButtonDefaultsMMD.buttonVerticalPadding,
+)
+
 @Composable
 private fun OrderBar(
     order: BrowseOrder,
@@ -279,12 +290,19 @@ private fun OrderBar(
                 modifier = Modifier.weight(1f),
                 colors = barColors(selected = candidate == order),
                 border = barBorder(selected = candidate == order),
+                contentPadding = OrderBarPadding,
             ) {
-                TextMMD(text = candidate.label)
+                TextMMD(text = candidate.label, maxLines = 1)
             }
         }
-        ButtonMMD(onClick = onToggleDirection) {
-            TextMMD(text = if (descending) "Z-A" else "A-Z")
+        ButtonMMD(
+            onClick = onToggleDirection,
+            contentPadding = PaddingValues(
+                horizontal = 10.dp,
+                vertical = ButtonDefaultsMMD.buttonVerticalPadding,
+            ),
+        ) {
+            TextMMD(text = if (descending) "Z-A" else "A-Z", maxLines = 1)
         }
     }
 }

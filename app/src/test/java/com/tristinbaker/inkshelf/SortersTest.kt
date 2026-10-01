@@ -7,6 +7,7 @@ import com.tristinbaker.inkshelf.data.Sorters
 import com.tristinbaker.inkshelf.ui.AuthorRow
 import com.tristinbaker.inkshelf.ui.distinctAuthors
 import com.tristinbaker.inkshelf.ui.distinctSeries
+import com.tristinbaker.inkshelf.ui.inDirection
 import com.tristinbaker.inkshelf.ui.toAuthorRows
 import com.tristinbaker.inkshelf.ui.splitSeriesName
 import org.junit.Assert.assertEquals
@@ -246,6 +247,29 @@ class BrowseGroupingTest {
         ).distinctSeries()
 
         assertEquals(listOf("Cedar Cove"), series.map { it.name })
+    }
+
+    @Test
+    fun `Z-A reverses the author and series name order`() {
+        val books = listOf(
+            seriesItem("1", author="Agatha Christie", series="Poirot"),
+            seriesItem("2", author="Brandon Sanderson", series="Mistborn"),
+            seriesItem("3", author="Douglas Adams", series="Hitchhiker's Guide"),
+        )
+
+        // Authors sort by surname: Adams, Christie, Sanderson.
+        assertEquals(
+            listOf("Brandon Sanderson", "Agatha Christie", "Douglas Adams"),
+            books.distinctAuthors().inDirection(descending = true).map { it.name },
+        )
+        assertEquals(
+            listOf("Poirot", "Mistborn", "Hitchhiker's Guide"),
+            books.distinctSeries().inDirection(descending = true).map { it.name },
+        )
+        assertEquals(
+            books.distinctSeries().map { it.name },
+            books.distinctSeries().inDirection(descending = false).map { it.name },
+        )
     }
 
     @Test
