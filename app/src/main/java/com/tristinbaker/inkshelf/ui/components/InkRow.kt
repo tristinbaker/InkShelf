@@ -21,7 +21,10 @@ import androidx.compose.runtime.Composable
 /**
  * One tappable list row. Rows are separated with a full-strength rule rather
  * than a subtle background tint, because light greys render inconsistently on a
- * 16-level greyscale panel at 217 PPI.
+ * 16-level greyscale panel at 217 PPI. For the same reason a [selected] row is
+ * inverted to white on black rather than tinted grey: the panel dithered the
+ * tint into a speckle that swallowed the text on it. Inverted, the secondary
+ * text goes to white too, since a grey on black dithers the same way.
  */
 @Composable
 fun InkRow(
@@ -33,11 +36,13 @@ fun InkRow(
     leading: (@Composable () -> Unit)? = null,
     onClick: (() -> Unit)? = null,
 ) {
+    val ink = if (selected) GrayRamp.g4 else GrayRamp.g0
+    val secondaryInk = if (selected) GrayRamp.g4 else GrayRamp.g1
     Column(
         modifier = modifier
             .fillMaxWidth()
             .then(if (onClick != null) Modifier.clickable { onClick() } else Modifier)
-            .background(if (selected) GrayRamp.g3 else GrayRamp.g4)
+            .background(if (selected) GrayRamp.g0 else GrayRamp.g4)
             .padding(horizontal = 12.dp, vertical = 8.dp),
     ) {
         Row(
@@ -55,21 +60,21 @@ fun InkRow(
                     text = title,
                     maxLines = 2,
                     overflow = TextOverflow.Ellipsis,
-                    color = GrayRamp.g0,
+                    color = ink,
                 )
                 if (subtitle != null) {
                     TextMMD(
                         text = subtitle,
                         maxLines = 1,
                         overflow = TextOverflow.Ellipsis,
-                        color = GrayRamp.g1,
+                        color = secondaryInk,
                     )
                 }
             }
             if (trailing != null) {
                 TextMMD(
                     text = trailing,
-                    color = GrayRamp.g1,
+                    color = secondaryInk,
                     modifier = Modifier.padding(start = 8.dp),
                 )
             }
@@ -82,10 +87,10 @@ fun InkRow(
 fun SectionHeader(text: String, modifier: Modifier = Modifier) {
     TextMMD(
         text = text.uppercase(),
-        color = GrayRamp.g0,
+        color = GrayRamp.g4,
         modifier = modifier
             .fillMaxWidth()
-            .background(GrayRamp.g3)
+            .background(GrayRamp.g0)
             .padding(horizontal = 12.dp, vertical = 4.dp),
     )
 }
@@ -93,27 +98,26 @@ fun SectionHeader(text: String, modifier: Modifier = Modifier) {
 /**
  * The A-Z divider between two runs of a browse list.
  *
- * Same grey as [SectionHeader] so the two read as the same family of chrome,
+ * Inverted like [SectionHeader] so the two read as the same family of chrome,
  * but carrying a single large letter: at one glyph the bar is a position cue
  * rather than a label, and it needs to be findable at a glance while scrolling
- * rather than read. Black on `g3` keeps it dark enough to separate the two runs
- * on a panel that renders light greys unreliably.
+ * rather than read. Both used to sit on `g3`, which the panel dithers into a
+ * speckle that the black glyph drowned in; pure black and white render crisply.
  */
 @Composable
 fun LetterBar(letter: String, modifier: Modifier = Modifier) {
     Box(
         modifier = modifier
             .fillMaxWidth()
-            .background(GrayRamp.g3),
+            .background(GrayRamp.g0),
         contentAlignment = Alignment.Center,
     ) {
         TextMMD(
             text = letter,
-            color = GrayRamp.g0,
+            color = GrayRamp.g4,
             modifier = Modifier.padding(vertical = 3.dp),
         )
     }
-    HorizontalDividerMMD(color = GrayRamp.g0, thickness = 1.dp)
 }
 
 @Composable

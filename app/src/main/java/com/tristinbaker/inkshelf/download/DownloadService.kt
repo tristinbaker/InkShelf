@@ -11,6 +11,7 @@ import android.content.Intent
 import android.content.pm.ServiceInfo
 import android.net.Uri
 import android.os.Build
+import android.os.Environment
 import android.os.IBinder
 import android.provider.DocumentsContract
 import android.provider.MediaStore
@@ -25,19 +26,28 @@ import com.tristinbaker.inkshelf.core.storage.DownloadFolder
 import com.tristinbaker.inkshelf.data.DownloadDao
 import com.tristinbaker.inkshelf.data.DownloadEntity
 import com.tristinbaker.inkshelf.data.toBookMetadata
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.CoroutineStart
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.cancel
+import kotlinx.coroutines.cancelAndJoin
+import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.currentCoroutineContext
+import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
+import okhttp3.Call
 import okhttp3.OkHttpClient
 import okhttp3.Request
 import okhttp3.Response
+import java.io.File
 import java.io.IOException
+import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.atomic.AtomicInteger
 
 /**
@@ -85,6 +95,22 @@ class DownloadService : Service() {
      */
     @Volatile
     private var activeRowId: String? = null
+
+    /** The transfer the drain loop is running now, so a removal can stop it. */
+    private class Transfer(val itemId: String, val job: Job) {
+        /** Set once the request is made; cancelling it unblocks a parked read. */
+        @Volatile
+        var call: Call? = null
+    }
+
+    @Volatile
+    private var activeTransfer: Transfer? = null
+
+    /**
+     * Items being removed right now. The drain loop must not start, or carry on
+     * with, another file of a book whose rows are about to be deleted.
+     */
+    private val removing: MutableSet<String> = ConcurrentHashMap.newKeySet()
 
     override fun onCreate() {
         super.onCreate()
@@ -244,15 +270,41 @@ class DownloadService : Service() {
         }
     }
 
+    /**
+     * Deletes a book's files and rows, stopping its transfer first if one is
+     * running, which is what makes this double as cancelling a download.
+     *
+     * The transfer has to be fully stopped before anything is deleted. Left
+     * running, its next progress write or its final DONE re-created the row
+     * that had just been removed, and the download came back on its own.
+     */
     private suspend fun remove(itemId: String) {
-        val dao = locator.database.downloadDao()
-        for (row in dao.observeForItem(itemId).first()) {
-            row.uri?.let { deleteMedia(Uri.parse(it)) }
+        removing += itemId
+        try {
+            activeTransfer?.takeIf { it.itemId == itemId }?.let { transfer ->
+                Log.i(TAG, "cancelling the running download of $itemId")
+                // The read is blocking, so coroutine cancellation alone would
+                // wait for the next chunk. Cancelling the call aborts it now.
+                transfer.call?.cancel()
+                transfer.job.cancelAndJoin()
+            }
+            val dao = locator.database.downloadDao()
+            val rows = dao.observeForItem(itemId).first()
+            // Looked up before the files go: a MediaStore row is the only record
+            // of which folder its file was in, and it is gone once deleted.
+            val folders = rows.mapNotNull { row -> row.uri?.let { folderOf(Uri.parse(it)) } }.distinct()
+            for (row in rows) {
+                row.uri?.let { deleteMedia(Uri.parse(it)) }
+            }
+            folders.forEach(::deleteIfEmpty)
+            dao.deleteForItem(itemId)
+            // The offline description goes with the files: keeping it would leave a
+            // book the app can still describe but can no longer play.
+            locator.database.bookMetadataDao().delete(itemId)
+        } finally {
+            removing -= itemId
         }
-        dao.deleteForItem(itemId)
-        // The offline description goes with the files: keeping it would leave a
-        // book the app can still describe but can no longer play.
-        locator.database.bookMetadataDao().delete(itemId)
+        publishNotification()
     }
 
     /**
@@ -288,7 +340,7 @@ class DownloadService : Service() {
             // DONE, and this process is what steps over it forever otherwise.
             reclaimStale(dao)
             val next = dao.unfinished()
-                .firstOrNull { it.state != DownloadEntity.STATE_RUNNING }
+                .firstOrNull { it.state != DownloadEntity.STATE_RUNNING && it.itemId !in removing }
                 ?: break
             // Without a session there is nothing to fetch. Fetching anyway would
             // return without touching the row and the loop would spin on it.
@@ -340,8 +392,20 @@ class DownloadService : Service() {
         val url = serverUrl() ?: return
         activeRowId = row.id
         try {
-            fetchWithServer(dao, row, url)
+            // A child job of its own, so [remove] can cancel this one transfer
+            // without taking the drain loop down with it. Published before it
+            // starts and re-checked after, so a removal that lands in between
+            // either finds the transfer to cancel or is seen here.
+            coroutineScope {
+                val job = launch(start = CoroutineStart.LAZY) {
+                    fetchWithServer(dao, row, url)
+                }
+                activeTransfer = Transfer(row.itemId, job)
+                if (row.itemId in removing) job.cancel()
+                job.join()
+            }
         } finally {
+            activeTransfer = null
             activeRowId = null
         }
     }
@@ -390,7 +454,10 @@ class DownloadService : Service() {
 
         var response: Response? = null
         try {
-            response = client.newCall(request).execute()
+            val call = client.newCall(request)
+            activeTransfer?.call = call
+            currentCoroutineContext().ensureActive()
+            response = call.execute()
             if (!response.isSuccessful) {
                 // The length probe can be refused by a server that serves the
                 // body anyway, so a rejected range still means the file on disk
@@ -441,7 +508,12 @@ class DownloadService : Service() {
             )
             publish(uri)
             publishNotification()
+        } catch (e: CancellationException) {
+            throw e
         } catch (e: IOException) {
+            // A cancelled call surfaces here as "Canceled". That is a removal,
+            // not a failure, and recording it would bring the row back.
+            currentCoroutineContext().ensureActive()
             fail(dao, row, "Network error: ${e.message ?: "connection lost"}")
         } catch (e: Exception) {
             Log.w(TAG, "download failed for ${row.id}", e)
@@ -719,6 +791,70 @@ class DownloadService : Service() {
     private fun deleteMedia(uri: Uri) {
         runCatching { contentResolver.delete(uri, null, null) }
             .onFailure { Log.w(TAG, "could not delete $uri", it) }
+    }
+
+    /** The per-book folder a downloaded file was written into. */
+    private sealed interface BookFolder {
+        data class Document(val uri: Uri) : BookFolder
+        data class Path(val dir: File) : BookFolder
+    }
+
+    /**
+     * Where [file] lives, or null when that cannot be worked out or is a folder
+     * this app must never remove. Deleting a file leaves its book's folder
+     * behind on both storage paths, so a removal has to clear it up itself.
+     */
+    private fun folderOf(file: Uri): BookFolder? = runCatching {
+        if (file.authority == MediaStore.AUTHORITY) {
+            val relative = contentResolver.query(
+                file,
+                arrayOf(MediaStore.Audio.Media.RELATIVE_PATH),
+                null,
+                null,
+                null,
+            )?.use { if (it.moveToFirst()) it.getString(0) else null }?.trimEnd('/')
+            // Only a book's own folder under InkShelf/, never InkShelf/ or Music/.
+            val root = "${Environment.DIRECTORY_MUSIC}/InkShelf/"
+            if (relative == null || !relative.startsWith(root) || relative.length <= root.length) {
+                return@runCatching null
+            }
+            @Suppress("DEPRECATION")
+            BookFolder.Path(File(Environment.getExternalStorageDirectory(), relative))
+        } else {
+            val ids = DocumentsContract.findDocumentPath(contentResolver, file)?.path
+                ?: return@runCatching null
+            val parentId = ids.getOrNull(ids.size - 2) ?: return@runCatching null
+            // The folder the user picked is theirs, not a book folder; a flat
+            // provider without subfolders writes straight into it.
+            if (parentId == DocumentsContract.getTreeDocumentId(file)) return@runCatching null
+            BookFolder.Document(DocumentsContract.buildDocumentUriUsingTree(file, parentId))
+        }
+    }.onFailure { Log.w(TAG, "could not find the folder of $file", it) }.getOrNull()
+
+    private fun deleteIfEmpty(folder: BookFolder) {
+        runCatching {
+            when (folder) {
+                // deleteDocument is recursive on a directory, so emptiness has to
+                // be checked here rather than left to the provider.
+                is BookFolder.Document -> {
+                    val children = DocumentsContract.buildChildDocumentsUriUsingTree(
+                        folder.uri,
+                        DocumentsContract.getDocumentId(folder.uri),
+                    )
+                    val empty = contentResolver.query(
+                        children,
+                        arrayOf(DocumentsContract.Document.COLUMN_DOCUMENT_ID),
+                        null,
+                        null,
+                        null,
+                    )?.use { it.count == 0 } ?: false
+                    if (empty) DocumentsContract.deleteDocument(contentResolver, folder.uri)
+                }
+                // Not checked first: scoped storage hides other apps' files from
+                // a listing, but rmdir still refuses a folder that holds any.
+                is BookFolder.Path -> folder.dir.delete()
+            }
+        }.onFailure { Log.w(TAG, "could not remove empty folder $folder", it) }
     }
 
     private fun serverUrl(): ServerUrl? =

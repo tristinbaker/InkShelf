@@ -76,6 +76,7 @@ fun BookScreen(
     onBack: () -> Unit,
 ) {
     var confirmingDelete by remember { mutableStateOf(false) }
+    var confirmingCancel by remember { mutableStateOf(false) }
 
     // The dialog is the *last* child so it draws over the page. Emitted before
     // the Column it sat underneath it: the page painted on top, the dialog was
@@ -159,6 +160,14 @@ fun BookScreen(
                             color = GrayRamp.g0,
                         )
                         LinearProgressIndicatorMMD(progress = { download.progress })
+                        // Spelled out as well as on the ring: a ring reads as a
+                        // progress readout, not as something to tap to stop it.
+                        OutlinedButtonMMD(
+                            onClick = { confirmingCancel = true },
+                            modifier = Modifier.fillMaxWidth(),
+                        ) {
+                            TextMMD(text = "Cancel download")
+                        }
                     }
                 }
                     Box(
@@ -174,10 +183,13 @@ fun BookScreen(
                             },
                             size = GLYPH_SIZE,
                             onClick = {
-                                if (download?.isComplete == true) {
-                                    confirmingDelete = true
-                                } else {
-                                    actions.onDownload()
+                                when {
+                                    download?.isComplete == true -> confirmingDelete = true
+                                    // Tapping the ring used to re-queue the book,
+                                    // which did nothing visible; stopping it is
+                                    // the only useful thing a tap there can mean.
+                                    download?.isActive == true -> confirmingCancel = true
+                                    else -> actions.onDownload()
                                 }
                             },
                         )
@@ -218,6 +230,20 @@ fun BookScreen(
                     actions.onCancelDownload()
                 },
                 onDismiss = { confirmingDelete = false },
+            )
+        }
+
+        if (confirmingCancel) {
+            ConfirmDialog(
+                title = "Cancel download?",
+                body = "The download of \"$title\" will stop and anything " +
+                    "already saved will be deleted.",
+                confirmLabel = "Stop",
+                onConfirm = {
+                    confirmingCancel = false
+                    actions.onCancelDownload()
+                },
+                onDismiss = { confirmingCancel = false },
             )
         }
     }

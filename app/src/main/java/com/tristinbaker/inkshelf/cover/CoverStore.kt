@@ -28,9 +28,10 @@ import kotlinx.coroutines.sync.withPermit
  * without a session and a cached cover survives signing out.
  *
  * Decoding is what actually costs on a 16-level panel, so bitmaps are decoded
- * straight to the requested size rather than full-size-then-scaled, and held as
- * RGB_565 because covers have no alpha: that halves the memory a screenful of
- * thumbnails costs.
+ * straight to the requested size rather than full-size-then-scaled, then run
+ * through [CoverDither] so the panel draws them as shading rather than as a
+ * dark square. The disk cache keeps the original JPEG; only the memory cache
+ * holds the dithered result, as RGB_565 because covers have no alpha.
  */
 class CoverStore(
     context: Context,
@@ -99,7 +100,11 @@ class CoverStore(
             }
         } ?: return null
 
-        return decodePermits.withPermit { decode(bytes, width) }?.also { memory.put(key, it) }
+        return decodePermits.withPermit {
+            decode(bytes, width)?.let { raw ->
+                CoverDither.process(raw, width).also { if (it !== raw) raw.recycle() }
+            }
+        }?.also { memory.put(key, it) }
     }
 
     /**

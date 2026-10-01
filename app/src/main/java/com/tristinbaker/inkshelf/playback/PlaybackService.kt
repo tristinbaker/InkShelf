@@ -26,6 +26,8 @@ import androidx.media3.datasource.okhttp.OkHttpDataSource
 import androidx.media3.exoplayer.ExoPlayer
 import androidx.core.app.ServiceCompat
 import androidx.media3.exoplayer.source.DefaultMediaSourceFactory
+import androidx.media3.extractor.DefaultExtractorsFactory
+import androidx.media3.extractor.mp4.Mp4Extractor
 import androidx.media3.session.CommandButton
 import androidx.media3.session.MediaNotification
 import androidx.media3.session.MediaSession
@@ -140,6 +142,17 @@ class PlaybackService : MediaSessionService() {
     private val warnedOffline = java.util.concurrent.atomic.AtomicBoolean(false)
     private var loadJob: Job? = null
 
+    /**
+     * The MP4 extractor holds the whole sample table on the Java heap, about 24
+     * bytes per AAC frame, so a 60-hour single-file m4b needs some 230 MB before
+     * a sample plays. That is why the manifest asks for a large heap. Edit lists
+     * are ignored because applying one copies every table, doubling that peak,
+     * and all it buys an audiobook is trimming a few dozen milliseconds of
+     * encoder priming.
+     */
+    private fun extractorsFactory() = DefaultExtractorsFactory()
+        .setMp4ExtractorFlags(Mp4Extractor.FLAG_WORKAROUND_IGNORE_EDIT_LISTS)
+
     override fun onCreate() {
         super.onCreate()
         locator = ServiceLocator.get(this)
@@ -156,7 +169,7 @@ class PlaybackService : MediaSessionService() {
                 true,
             )
             .setHandleAudioBecomingNoisy(true)
-            .setMediaSourceFactory(DefaultMediaSourceFactory(dataSourceFactory))
+            .setMediaSourceFactory(DefaultMediaSourceFactory(dataSourceFactory, extractorsFactory()))
             .build()
 
         player.addListener(playerListener)
@@ -993,11 +1006,20 @@ private fun PlaybackException.readableMessage(): String {
         return "The server rejected the access token. Sign in again."
     }
 
+    // Surfaces as ERROR_CODE_IO_UNSPECIFIED, which used to be reported as an
+    // unreachable server, even for a file already on the device.
+    if (generateSequence(cause) { it.cause }.any { it is OutOfMemoryError }) {
+        return "This book is too large for the player to open."
+    }
+
     return when (errorCode) {
         PlaybackException.ERROR_CODE_IO_NETWORK_CONNECTION_FAILED,
         PlaybackException.ERROR_CODE_IO_NETWORK_CONNECTION_TIMEOUT,
-        PlaybackException.ERROR_CODE_IO_UNSPECIFIED,
         -> "Could not reach the server."
+
+        // Not a network code: it is any I/O failure, local files included.
+        PlaybackException.ERROR_CODE_IO_UNSPECIFIED ->
+            "The audio could not be read."
 
         PlaybackException.ERROR_CODE_IO_BAD_HTTP_STATUS ->
             "The server refused the request${httpStatus?.let { " (HTTP $it)" } ?: ""}."

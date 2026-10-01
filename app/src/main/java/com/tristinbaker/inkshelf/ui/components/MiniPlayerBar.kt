@@ -22,6 +22,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.mudita.mmd.components.buttons.ButtonMMD
 import com.mudita.mmd.components.buttons.OutlinedButtonMMD
+import com.mudita.mmd.components.divider.HorizontalDividerMMD
 import com.mudita.mmd.components.slider.SliderMMD
 import com.mudita.mmd.components.text.TextMMD
 import com.tristinbaker.inkshelf.R
@@ -54,11 +55,15 @@ fun MiniPlayerBar(
 ) {
     val itemId = state.itemId
 
+    // White under a heavy black rule rather than a grey tint: the panel dithered
+    // the tint into a speckle that the title and the outlined skips sank into.
+    // The rule is what sets the bar apart from the list scrolling above it.
     Column(
         modifier = modifier
             .fillMaxWidth()
-            .background(GrayRamp.g3),
+            .background(GrayRamp.g4),
     ) {
+        HorizontalDividerMMD(color = GrayRamp.g0, thickness = 2.dp)
         Row(
             modifier = Modifier
                 .fillMaxWidth()
