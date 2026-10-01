@@ -6,6 +6,13 @@ built for the Mudita Kompakt.
 This is a fresh client, not a fork of the Audiobookshelf web app. It speaks the Audiobookshelf
 REST API directly.
 
+|   |   |   |
+|---|---|---|
+| <img width="480" height="800" alt="1" src="https://github.com/user-attachments/assets/642fe551-aeb9-4cc0-b24c-3b387544c222" /> | <img width="480" height="800" alt="2" src="https://github.com/user-attachments/assets/f1b6e380-40ab-46e4-adfb-82eb4a56fa13" /> | <img width="480" height="800" alt="3" src="https://github.com/user-attachments/assets/89fed2d6-6050-43f6-829e-8a141ffc9665" /> |
+| <img width="480" height="800" alt="3actually" src="https://github.com/user-attachments/assets/96ab047a-9e81-468d-bdfb-fec7f028a1d1" /> | <img width="480" height="800" alt="5" src="https://github.com/user-attachments/assets/5404a2db-b50c-4830-b67b-fa46cdfacb4f" /> | <img width="480" height="800" alt="6" src="https://github.com/user-attachments/assets/286ebc93-7f86-4fce-a602-85e9b17de332" /> |
+
+
+
 ## Build
 
 Requires JDK 17 and an Android SDK with platform 35.
