@@ -18,8 +18,8 @@ android {
         // Android 13, so the older path would be untested dead weight.
         minSdk = 29
         targetSdk = 34
-        versionCode = 4
-        versionName = "1.0.3"
+        versionCode = 5
+        versionName = "1.0.4"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }
