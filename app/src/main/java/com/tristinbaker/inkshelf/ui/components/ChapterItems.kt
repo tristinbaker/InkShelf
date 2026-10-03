@@ -27,7 +27,7 @@ fun LazyListScope.chapterItems(
     onSelect: (Long) -> Unit,
 ) {
     item(key = "chapters-header") {
-        SectionHeader("Chapters", modifier = Modifier.padding(top = 8.dp))
+        SectionHeader("Chapters")
     }
 
     if (chapters.isEmpty()) {

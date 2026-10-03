@@ -1,13 +1,18 @@
 package com.tristinbaker.inkshelf.ui.screens
 
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
 import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.LocalContentColor
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -15,13 +20,15 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.ColorFilter
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.unit.dp
-import com.mudita.mmd.components.buttons.ButtonMMD
 import com.mudita.mmd.components.buttons.OutlinedButtonMMD
 import com.mudita.mmd.components.lazy.LazyColumnMMD
 import com.mudita.mmd.components.progress_indicator.LinearProgressIndicatorMMD
 import com.mudita.mmd.components.text.TextMMD
 import com.mudita.mmd.components.top_app_bar.TopAppBarMMD
+import com.tristinbaker.inkshelf.R
 import com.tristinbaker.inkshelf.ui.components.BackButton
 import com.tristinbaker.inkshelf.core.abs.Chapter
 import com.tristinbaker.inkshelf.download.DownloadSummary
@@ -32,7 +39,6 @@ import com.tristinbaker.inkshelf.ui.components.DownloadGlyph
 import com.tristinbaker.inkshelf.ui.components.DownloadGlyphState
 import com.tristinbaker.inkshelf.ui.components.Gap
 import com.tristinbaker.inkshelf.ui.components.InkRow
-import com.tristinbaker.inkshelf.ui.components.SectionHeader
 import com.tristinbaker.inkshelf.ui.components.chapterItems
 import com.tristinbaker.inkshelf.ui.components.formatClock
 import com.tristinbaker.inkshelf.ui.components.formatDuration
@@ -46,6 +52,8 @@ private const val PAGE_JUMP_STEP = 0
  * scroll on a 480x600 panel.
  */
 private val GLYPH_SIZE = 58.dp
+
+private val PLAY_ICON_SIZE = 22.dp
 
 private val DETAIL_COVER_WIDTH = 220.dp
 private val DETAIL_COVER_HEIGHT = 220.dp
@@ -198,17 +206,25 @@ fun BookScreen(
                 }
             }
 
-            item { SectionHeader("Listen") }
+            // Outlined, like the download glyph beside the facts above it, and
+            // with no "Listen" header: a solid black slab was the heaviest thing
+            // on the page after the cover, and a header over one button only
+            // labelled what the play triangle already says.
             item {
-                Column(
+                OutlinedButtonMMD(
+                    onClick = actions.onPlay,
                     modifier = Modifier
                         .fillMaxWidth()
-                        .padding(horizontal = 12.dp, vertical = 10.dp),
-                    verticalArrangement = Arrangement.spacedBy(8.dp),
+                        .padding(start = 12.dp, end = 12.dp, top = 2.dp, bottom = 10.dp),
                 ) {
-                    ButtonMMD(onClick = actions.onPlay, modifier = Modifier.fillMaxWidth()) {
-                        TextMMD(text = actions.resumeLabel ?: "Play")
-                    }
+                    Image(
+                        painter = painterResource(R.drawable.ic_play),
+                        contentDescription = null,
+                        colorFilter = ColorFilter.tint(LocalContentColor.current),
+                        modifier = Modifier.size(PLAY_ICON_SIZE),
+                    )
+                    Spacer(modifier = Modifier.width(8.dp))
+                    TextMMD(text = actions.resumeLabel ?: "Play")
                 }
             }
 

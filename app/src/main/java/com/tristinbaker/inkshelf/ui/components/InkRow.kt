@@ -2,7 +2,6 @@ package com.tristinbaker.inkshelf.ui.components
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
-import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -11,8 +10,10 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import com.mudita.mmd.components.divider.HorizontalDividerMMD
 import com.mudita.mmd.components.text.TextMMD
 import com.tristinbaker.inkshelf.ui.theme.GrayRamp
@@ -83,40 +84,47 @@ fun InkRow(
     HorizontalDividerMMD(color = GrayRamp.g2, thickness = 1.dp)
 }
 
+/**
+ * A labelled break between groups of rows: bold black type over a 2.dp black
+ * rule, on the page's own white. It used to be a solid black bar with white
+ * type, which read as crisp but heavy; slabs of black every few rows pulled the
+ * eye away from the rows themselves. The rule keeps the header unmistakably
+ * stronger than the 1.dp `g2` row dividers without filling anything in.
+ */
 @Composable
 fun SectionHeader(text: String, modifier: Modifier = Modifier) {
-    TextMMD(
-        text = text.uppercase(),
-        color = GrayRamp.g4,
-        modifier = modifier
-            .fillMaxWidth()
-            .background(GrayRamp.g0)
-            .padding(horizontal = 12.dp, vertical = 4.dp),
-    )
+    Column(modifier = modifier.fillMaxWidth()) {
+        TextMMD(
+            text = text.uppercase(),
+            color = GrayRamp.g0,
+            fontWeight = FontWeight.Bold,
+            letterSpacing = 1.5.sp,
+            modifier = Modifier.padding(start = 12.dp, end = 12.dp, top = 16.dp, bottom = 4.dp),
+        )
+        HorizontalDividerMMD(color = GrayRamp.g0, thickness = 2.dp)
+    }
 }
 
 /**
  * The A-Z divider between two runs of a browse list.
  *
- * Inverted like [SectionHeader] so the two read as the same family of chrome,
- * but carrying a single large letter: at one glyph the bar is a position cue
- * rather than a label, and it needs to be findable at a glance while scrolling
- * rather than read. Both used to sit on `g3`, which the panel dithers into a
- * speckle that the black glyph drowned in; pure black and white render crisply.
+ * Drawn like [SectionHeader] so the two read as the same family of chrome, but
+ * carrying a single larger letter at the left edge, the way an index or a
+ * contacts list does: at one glyph it is a position cue rather than a label,
+ * and it needs to be findable at a glance while scrolling rather than read.
+ * Pure black on white throughout; the panel dithers greys behind text.
  */
 @Composable
 fun LetterBar(letter: String, modifier: Modifier = Modifier) {
-    Box(
-        modifier = modifier
-            .fillMaxWidth()
-            .background(GrayRamp.g0),
-        contentAlignment = Alignment.Center,
-    ) {
+    Column(modifier = modifier.fillMaxWidth()) {
         TextMMD(
             text = letter,
-            color = GrayRamp.g4,
-            modifier = Modifier.padding(vertical = 3.dp),
+            color = GrayRamp.g0,
+            fontWeight = FontWeight.Bold,
+            fontSize = 22.sp,
+            modifier = Modifier.padding(start = 12.dp, end = 12.dp, top = 12.dp, bottom = 2.dp),
         )
+        HorizontalDividerMMD(color = GrayRamp.g0, thickness = 2.dp)
     }
 }
 
