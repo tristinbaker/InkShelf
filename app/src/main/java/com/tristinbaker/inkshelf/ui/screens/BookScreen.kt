@@ -22,6 +22,7 @@ import com.mudita.mmd.components.lazy.LazyColumnMMD
 import com.mudita.mmd.components.progress_indicator.LinearProgressIndicatorMMD
 import com.mudita.mmd.components.text.TextMMD
 import com.mudita.mmd.components.top_app_bar.TopAppBarMMD
+import com.tristinbaker.inkshelf.ui.components.BackButton
 import com.tristinbaker.inkshelf.core.abs.Chapter
 import com.tristinbaker.inkshelf.download.DownloadSummary
 import com.tristinbaker.inkshelf.cover.CoverStore
@@ -85,7 +86,7 @@ fun BookScreen(
     Column(modifier = Modifier.fillMaxSize()) {
         TopAppBarMMD(
             title = { TextMMD(text = title, maxLines = 1) },
-            navigationIcon = { ButtonMMD(onClick = onBack) { TextMMD(text = "Back") } },
+            navigationIcon = { BackButton(onClick = onBack) },
         )
 
         LazyColumnMMD(

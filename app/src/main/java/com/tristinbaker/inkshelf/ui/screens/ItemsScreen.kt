@@ -14,6 +14,7 @@ import com.mudita.mmd.components.lazy.LazyColumnMMD
 import com.mudita.mmd.components.progress_indicator.CircularProgressIndicatorMMD
 import com.mudita.mmd.components.text.TextMMD
 import com.mudita.mmd.components.top_app_bar.TopAppBarMMD
+import com.tristinbaker.inkshelf.ui.components.BackButton
 import com.tristinbaker.inkshelf.data.ItemEntity
 import com.tristinbaker.inkshelf.cover.CoverStore
 import com.tristinbaker.inkshelf.ui.components.CoverImage
@@ -46,7 +47,7 @@ fun ItemsScreen(
                 TextMMD(text = title, maxLines = 1)
             },
             navigationIcon = {
-                ButtonMMD(onClick = onBack) { TextMMD(text = "Back") }
+                BackButton(onClick = onBack)
             },
         )
 

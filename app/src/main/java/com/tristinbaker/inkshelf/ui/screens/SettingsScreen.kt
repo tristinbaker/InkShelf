@@ -13,6 +13,7 @@ import com.mudita.mmd.components.buttons.ButtonMMD
 import com.mudita.mmd.components.lazy.LazyColumnMMD
 import com.mudita.mmd.components.text.TextMMD
 import com.mudita.mmd.components.top_app_bar.TopAppBarMMD
+import com.tristinbaker.inkshelf.ui.components.BackButton
 import com.tristinbaker.inkshelf.core.eink.EinkMode
 import com.tristinbaker.inkshelf.core.storage.DownloadFolder
 import com.tristinbaker.inkshelf.ui.components.Gap
@@ -45,7 +46,7 @@ fun SettingsScreen(
     Column(modifier = Modifier.fillMaxSize()) {
         TopAppBarMMD(
             title = { TextMMD(text = "Settings") },
-            navigationIcon = { ButtonMMD(onClick = onBack) { TextMMD(text = "Back") } },
+            navigationIcon = { BackButton(onClick = onBack) },
         )
 
         LazyColumnMMD(modifier = Modifier.fillMaxSize(), scrollStep = PAGE_JUMP_STEP) {

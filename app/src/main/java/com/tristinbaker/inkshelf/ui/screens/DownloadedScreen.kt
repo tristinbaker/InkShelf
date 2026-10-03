@@ -13,6 +13,7 @@ import com.mudita.mmd.components.buttons.ButtonMMD
 import com.mudita.mmd.components.lazy.LazyColumnMMD
 import com.mudita.mmd.components.text.TextMMD
 import com.mudita.mmd.components.top_app_bar.TopAppBarMMD
+import com.tristinbaker.inkshelf.ui.components.BackButton
 import com.tristinbaker.inkshelf.data.BookMetadataEntity
 import com.tristinbaker.inkshelf.ui.components.Gap
 import com.tristinbaker.inkshelf.ui.components.formatDuration
@@ -37,7 +38,7 @@ fun DownloadedScreen(
     Column(modifier = Modifier.fillMaxSize()) {
         TopAppBarMMD(
             title = { TextMMD(text = "Downloaded", maxLines = 1) },
-            navigationIcon = { ButtonMMD(onClick = onBack) { TextMMD(text = "Back") } },
+            navigationIcon = { BackButton(onClick = onBack) },
         )
 
         if (books.isEmpty()) {

@@ -32,6 +32,7 @@ import com.tristinbaker.inkshelf.cover.CoverStore
 import com.tristinbaker.inkshelf.ui.components.CoverImage
 import com.tristinbaker.inkshelf.ui.components.CoverThumbHeight
 import com.tristinbaker.inkshelf.ui.components.CoverThumbWidth
+import com.tristinbaker.inkshelf.ui.components.DownloadsButton
 import com.tristinbaker.inkshelf.ui.components.Gap
 import com.tristinbaker.inkshelf.ui.components.InkRow
 import com.tristinbaker.inkshelf.ui.components.LetterBar
@@ -77,12 +78,10 @@ fun BrowseScreen(
             title = { TextMMD(text = selectedLibrary?.name ?: "InkShelf") },
             actions = {
                 if (downloadedCount > 0) {
-                    ButtonMMD(
+                    DownloadsButton(
                         onClick = onOpenDownloaded,
                         modifier = Modifier.padding(end = 8.dp),
-                    ) {
-                        TextMMD(text = "Downloads", maxLines = 1)
-                    }
+                    )
                 }
                 ButtonMMD(onClick = onOpenSettings) { TextMMD(text = "Menu") }
             },
@@ -242,24 +241,24 @@ fun BrowseScreen(
  * own white, and the selected item inverts to a white fill with black text.
  */
 @Composable
+/** The selected bar item keeps MMD's solid black fill; the rest go white. */
 private fun barColors(selected: Boolean): ButtonColors =
     if (selected) {
+        ButtonDefaultsMMD.buttonColors()
+    } else {
         ButtonDefaultsMMD.buttonColors().copy(
             containerColor = GrayRamp.g4,
             contentColor = GrayRamp.g0,
         )
-    } else {
-        ButtonDefaultsMMD.buttonColors()
     }
 
 /**
- * A selected bar item sits on the same white page as its neighbours, so the
- * inverted fill alone does not say "selected" on its own. The outline makes it
- * explicit, and 2.dp of black is the width MMD already uses for its own
- * outlined buttons.
+ * A white bar item sits on the same white page as its neighbours, so without
+ * an outline it would read as loose text rather than a button. 2.dp of black is
+ * the width MMD already uses for its own outlined buttons.
  */
 private fun barBorder(selected: Boolean): BorderStroke? =
-    if (selected) BorderStroke(2.dp, GrayRamp.g0) else null
+    if (selected) null else BorderStroke(2.dp, GrayRamp.g0)
 
 /**
  * MMD's default horizontal padding is sized for a lone button. Four of them

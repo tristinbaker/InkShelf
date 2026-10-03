@@ -87,6 +87,14 @@ class DownloadService : Service() {
     private val inFlight = AtomicInteger(0)
 
     /**
+     * The newest start this service has seen. Stopping goes through
+     * [stopSelfResult] with it, so a start the drain loop has not yet seen,
+     * carrying the command the user just sent, refuses the stop.
+     */
+    @Volatile
+    private var lastStartId = 0
+
+    /**
      * Row this process is actively transferring, if any.
      *
      * Reclaiming a row whose previous coroutine is still parked in a write
@@ -119,7 +127,10 @@ class DownloadService : Service() {
         val dao = locator.database.downloadDao()
 
         scope.launch {
-            locator.downloads.commands.collect { command -> dispatch(command) }
+            locator.downloads.commands.collect { command ->
+                inFlight.incrementAndGet()
+                dispatch(command)
+            }
         }
 
         scope.launch {
@@ -143,14 +154,23 @@ class DownloadService : Service() {
         // command the UI sent before this process existed can be claimed now.
         locator.downloads.attach()?.let { queued ->
             Log.i(TAG, "picking up command held before start: $queued")
+            // Counted here rather than inside the coroutine. The drain loop
+            // runs on another thread from onCreate, and on this device it could
+            // find the queue empty and nothing in flight before the coroutine
+            // had started, then stop the service and cancel the enqueue
+            // mid-request: the Download button did nothing, every time.
+            inFlight.incrementAndGet()
             scope.launch { dispatch(queued) }
         }
+        // Published after the count above, so a drain that reads this id also
+        // sees the command it brought.
+        lastStartId = startId
         work.trySend(Unit)
         return START_NOT_STICKY
     }
 
+    /** The caller has already counted [command] in [inFlight]; this releases it. */
     private suspend fun dispatch(command: DownloadCommand) {
-        inFlight.incrementAndGet()
         try {
             when (command) {
                 is DownloadCommand.Enqueue -> enqueue(command.itemId)
@@ -177,7 +197,10 @@ class DownloadService : Service() {
     // ---- queue ------------------------------------------------------------
 
     private suspend fun enqueue(itemId: String) {
-        val url = serverUrl() ?: return
+        val url = serverUrl() ?: run {
+            Log.w(TAG, "cannot queue $itemId: no session")
+            return
+        }
         val detail = when (val result = locator.api.itemDetail(url, itemId)) {
             is ApiResult.Failure -> {
                 Log.w(TAG, "cannot queue $itemId: ${result.message}")
@@ -188,7 +211,10 @@ class DownloadService : Service() {
         }
 
         val tracks = detail.media.tracks
-        if (tracks.isEmpty()) return
+        if (tracks.none { it.contentUrl != null }) {
+            Log.w(TAG, "cannot queue $itemId: ${tracks.size} tracks, none downloadable")
+            return
+        }
 
         val title = detail.media.metadata.title.orEmpty().ifBlank { "Untitled" }
         val dao = locator.database.downloadDao()
@@ -254,10 +280,9 @@ class DownloadService : Service() {
                 ),
             )
         }
-
-        // `onStartCommand` drains on its own, but it can finish that drain before
-        // these rows exist, so every enqueue kicks one too. `drain` is guarded.
-        drain()
+        // No drain from here: `dispatch` signals the one drain loop once these
+        // rows exist. Calling it directly ran a second drain alongside the loop,
+        // and both could pick up the same queued row and write the same file.
     }
 
     private suspend fun retry(itemId: String) {
@@ -353,9 +378,11 @@ class DownloadService : Service() {
         // Queue empty and nothing still being set up: leave the foreground so no
         // permanent notification lingers. Stopping while a command is in flight
         // would cancel it, and the user would tap Download and see nothing.
-        if (inFlight.get() == 0 && dao.unfinished().isEmpty()) {
+        // The start id is read first: a start that lands during the checks has
+        // a newer one, so stopSelfResult refuses and its command survives.
+        val startId = lastStartId
+        if (inFlight.get() == 0 && dao.unfinished().isEmpty() && stopSelfResult(startId)) {
             stopForegroundCompat()
-            stopSelf()
         }
     }
 

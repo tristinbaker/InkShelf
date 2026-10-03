@@ -28,6 +28,7 @@ import com.mudita.mmd.components.lazy.LazyColumnMMD
 import com.mudita.mmd.components.slider.SliderMMD
 import com.mudita.mmd.components.text.TextMMD
 import com.mudita.mmd.components.top_app_bar.TopAppBarMMD
+import com.tristinbaker.inkshelf.ui.components.BackButton
 import com.tristinbaker.inkshelf.cover.CoverStore
 import com.tristinbaker.inkshelf.playback.PlayerState
 import com.tristinbaker.inkshelf.ui.components.CoverImage
@@ -86,7 +87,7 @@ fun PlayerScreen(
         Column(modifier = Modifier.fillMaxSize()) {
             TopAppBarMMD(
                 title = { TextMMD(text = "Now Playing", maxLines = 1) },
-                navigationIcon = { ButtonMMD(onClick = onBack) { TextMMD(text = "Back") } },
+                navigationIcon = { BackButton(onClick = onBack) },
             )
 
             LazyColumnMMD(
