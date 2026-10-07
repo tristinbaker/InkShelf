@@ -2,6 +2,7 @@ package com.tristinbaker.inkshelf.ui.screens
 
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
@@ -41,6 +42,13 @@ import com.tristinbaker.inkshelf.ui.components.formatDuration
 import com.tristinbaker.inkshelf.ui.theme.GrayRamp
 import androidx.compose.foundation.lazy.LazyListState
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
+import com.mudita.mmd.components.menus.DropdownMenuItemMMD
+import com.mudita.mmd.components.menus.DropdownMenuMMD
 
 /**
  * `scrollStep = 0` makes the list jump whole pages instead of pixel-scrolling,
@@ -108,7 +116,7 @@ fun BrowseScreen(
                     .fillMaxSize()
                     .padding(24.dp),
                 verticalArrangement = Arrangement.Center,
-                horizontalAlignment = androidx.compose.ui.Alignment.CenterHorizontally,
+                horizontalAlignment = Alignment.CenterHorizontally,
             ) {
                 CircularProgressIndicatorMMD()
             }
@@ -313,22 +321,42 @@ private fun LibraryBar(
     onSelect: (LibraryEntity) -> Unit,
 ) {
     if (libraries.size <= 1) return
-    Row(
-        modifier = Modifier
-            .fillMaxWidth()
-            .padding(horizontal = 8.dp),
-        horizontalArrangement = Arrangement.spacedBy(6.dp),
+
+    var expanded by remember { mutableStateOf(false) }
+
+    Box(
+        modifier = Modifier.fillMaxWidth().padding(horizontal = 8.dp)
     ) {
-        libraries.forEach { library ->
-            ButtonMMD(
-                onClick = { onSelect(library) },
-                colors = barColors(selected = library.id == selected?.id),
-                border = barBorder(selected = library.id == selected?.id),
-            ) {
-                TextMMD(
-                    text = library.name,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis,
+        ButtonMMD(
+            onClick = { expanded = true },
+            modifier = Modifier.fillMaxWidth()
+        ) {
+            TextMMD(
+                text = selected?.name ?: "InkShelf",
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+            )
+        }
+        DropdownMenuMMD(
+            expanded,
+            onDismissRequest = {
+                expanded = false
+            },
+            modifier = Modifier.fillMaxWidth()
+        ) {
+            libraries.forEach { library ->
+                DropdownMenuItemMMD(
+                    text = {
+                        TextMMD(
+                            text = library.name,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis
+                        )
+                    },
+                    onClick = {
+                        onSelect(library)
+                        expanded = false
+                    }
                 )
             }
         }
