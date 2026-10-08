@@ -10,18 +10,17 @@ import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import com.mudita.mmd.components.buttons.ButtonMMD
-import com.mudita.mmd.components.lazy.LazyColumnMMD
+import com.tristinbaker.inkshelf.ui.components.InkLazyColumn
 import com.mudita.mmd.components.text.TextMMD
 import com.mudita.mmd.components.top_app_bar.TopAppBarMMD
 import com.tristinbaker.inkshelf.ui.components.BackButton
 import com.tristinbaker.inkshelf.core.eink.EinkMode
+import com.tristinbaker.inkshelf.core.eink.ScrollMode
 import com.tristinbaker.inkshelf.core.storage.DownloadFolder
 import com.tristinbaker.inkshelf.ui.components.Gap
 import com.tristinbaker.inkshelf.ui.components.InkRow
 import com.tristinbaker.inkshelf.ui.components.SectionHeader
 import com.tristinbaker.inkshelf.ui.theme.GrayRamp
-
-private const val PAGE_JUMP_STEP = 0
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -34,8 +33,10 @@ fun SettingsScreen(
     serverUrl: String,
     username: String,
     showCovers: Boolean,
+    scrollMode: ScrollMode,
     onEinkMode: (EinkMode) -> Unit,
     onShowCovers: (Boolean) -> Unit,
+    onScrollMode: (ScrollMode) -> Unit,
     onPickDownloadFolder: () -> Unit,
     onResetDownloadFolder: () -> Unit,
     onFullRefresh: () -> Unit,
@@ -49,7 +50,7 @@ fun SettingsScreen(
             navigationIcon = { BackButton(onClick = onBack) },
         )
 
-        LazyColumnMMD(modifier = Modifier.fillMaxSize(), scrollStep = PAGE_JUMP_STEP) {
+        InkLazyColumn(modifier = Modifier.fillMaxSize()) {
             item { SectionHeader("Display") }
 
             item {
@@ -104,6 +105,21 @@ fun SettingsScreen(
                     trailing = if (showCovers) "On" else "Off",
                     selected = showCovers,
                     onClick = { onShowCovers(!showCovers) },
+                )
+            }
+
+            item { Gap(12) }
+            item { SectionHeader("Scrolling") }
+
+            // A pick-one list like the panel modes above, rather than an On/Off
+            // row: "Page scrolling: Off" says what it is not, not what you get.
+            items(ScrollMode.entries.size) { index ->
+                val mode = ScrollMode.entries[index]
+                InkRow(
+                    title = mode.label,
+                    subtitle = mode.description,
+                    selected = mode == scrollMode,
+                    onClick = { onScrollMode(mode) },
                 )
             }
 

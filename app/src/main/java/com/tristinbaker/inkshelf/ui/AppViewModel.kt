@@ -6,6 +6,7 @@ import com.tristinbaker.inkshelf.ServiceLocator
 import com.tristinbaker.inkshelf.core.abs.AuthorEntry
 import com.tristinbaker.inkshelf.core.abs.BrowseOrder
 import com.tristinbaker.inkshelf.core.abs.FilterGroup
+import com.tristinbaker.inkshelf.core.abs.ItemProgress
 import com.tristinbaker.inkshelf.core.abs.ItemSort
 import com.tristinbaker.inkshelf.core.abs.LibraryItem
 import com.tristinbaker.inkshelf.data.BookMetadataEntity
@@ -15,6 +16,7 @@ import com.tristinbaker.inkshelf.core.abs.buildFilter
 import android.content.Context
 import android.net.Uri
 import com.tristinbaker.inkshelf.core.eink.EinkMode
+import com.tristinbaker.inkshelf.core.eink.ScrollMode
 import com.tristinbaker.inkshelf.core.storage.DownloadFolder
 import com.tristinbaker.inkshelf.core.net.ApiResult
 import com.tristinbaker.inkshelf.core.net.ServerUrl
@@ -119,6 +121,10 @@ data class AppState(
     val message: String? = null,
     val busy: Boolean = false,
     val book: LibraryItem? = null,
+    /** A mark-finished write is in flight for [book]. */
+    val finishPending: Boolean = false,
+    /** Why the last mark-finished write failed, shown on the book page. */
+    val finishError: String? = null,
     /**
      * The list a book was opened from, so Back returns to that exact screen
      * (and, for the browse list, the same scroll position) rather than guessing.
@@ -131,6 +137,7 @@ data class AppState(
     val downloaded: List<BookMetadataEntity> = emptyList(),
     /** Cover art next to titles in lists. Off is the faster-refreshing option. */
     val showCovers: Boolean = true,
+    val scrollMode: ScrollMode = ScrollMode.PAGE,
 )
 
 class AppViewModel(private val locator: ServiceLocator) : ViewModel() {
@@ -145,6 +152,7 @@ class AppViewModel(private val locator: ServiceLocator) : ViewModel() {
             downloadFolderLabel = locator.downloadFolderLabel(),
             downloadFolderUsable = locator.downloadFolderUsable(),
             showCovers = locator.settings.showCovers,
+            scrollMode = locator.settings.scrollMode,
             einkAvailable = locator.meink.isAvailable,
             einkError = locator.meink.status.value.lastError,
         )
@@ -480,7 +488,7 @@ class AppViewModel(private val locator: ServiceLocator) : ViewModel() {
 
         val sort = order.itemSort
 
-        when (val result = locator.api.items(url, libraryId, sort, descending)) {
+        when (val result = locator.api.allItems(url, libraryId, sort, descending)) {
             is ApiResult.Failure -> {
                 // Fall back to the cache so browsing still works with no network.
                 val cached = locator.libraryCache.observeItems(libraryId).first()
@@ -508,7 +516,7 @@ class AppViewModel(private val locator: ServiceLocator) : ViewModel() {
             }
 
             is ApiResult.Ok -> {
-                val rows = result.value.items
+                val rows = result.value
                 if (state.filterLabel == null) {
                     locator.libraryCache.replaceItems(libraryId, rows)
                 }
@@ -523,7 +531,7 @@ class AppViewModel(private val locator: ServiceLocator) : ViewModel() {
                         series = _ui.value.browse.series,
                         error = null,
                         fromCache = false,
-                        totalOnServer = result.value.totalCount,
+                        totalOnServer = rows.size,
                     ),
                 )
             }
@@ -655,7 +663,7 @@ class AppViewModel(private val locator: ServiceLocator) : ViewModel() {
         val url = currentUrl() ?: return
         viewModelScope.launch {
             val filter = buildFilter(FilterGroup.SERIES, series.serverId)
-            val result = locator.api.items(
+            val result = locator.api.allItems(
                 url = url,
                 libraryId = library.id,
                 sort = ItemSort.SEQUENCE,
@@ -668,7 +676,7 @@ class AppViewModel(private val locator: ServiceLocator) : ViewModel() {
                 )
 
                 is ApiResult.Ok -> {
-                    val entities = result.value.items.map {
+                    val entities = result.value.map {
                         it.toEntity(System.currentTimeMillis())
                     }
                     _ui.value = _ui.value.copy(
@@ -677,7 +685,7 @@ class AppViewModel(private val locator: ServiceLocator) : ViewModel() {
                             items = entities,
                             error = null,
                             fromCache = false,
-                            totalOnServer = result.value.totalCount,
+                            totalOnServer = entities.size,
                         ),
                     )
                 }
@@ -714,7 +722,7 @@ class AppViewModel(private val locator: ServiceLocator) : ViewModel() {
         }
         val url = currentUrl() ?: return
         viewModelScope.launch {
-            val result = locator.api.items(
+            val result = locator.api.allItems(
                 url = url,
                 libraryId = library.id,
                 sort = BrowseOrder.TITLE.itemSort,
@@ -727,7 +735,7 @@ class AppViewModel(private val locator: ServiceLocator) : ViewModel() {
                 )
 
                 is ApiResult.Ok -> {
-                    val entities = result.value.items.map {
+                    val entities = result.value.map {
                         it.toEntity(System.currentTimeMillis())
                     }
                     _ui.value = _ui.value.copy(
@@ -736,7 +744,7 @@ class AppViewModel(private val locator: ServiceLocator) : ViewModel() {
                             items = entities,
                             error = null,
                             fromCache = false,
-                            totalOnServer = result.value.totalCount,
+                            totalOnServer = entities.size,
                         ),
                     )
                 }
@@ -836,7 +844,47 @@ class AppViewModel(private val locator: ServiceLocator) : ViewModel() {
     }
 
     fun backFromBook() {
-        _ui.value = _ui.value.copy(route = _ui.value.bookOrigin, book = null)
+        _ui.value = _ui.value.copy(route = _ui.value.bookOrigin, book = null, finishError = null)
+    }
+
+    /**
+     * Marks the open book finished, or not, on the server.
+     *
+     * Server-only, with no offline queue: finished is shared state the other
+     * Audiobookshelf clients read, so a mark that silently never arrived would be
+     * worse than one that says it failed. The page flips as soon as the write
+     * lands, then re-reads the item so it shows whatever the server stored.
+     */
+    fun setFinished(finished: Boolean) {
+        val book = _ui.value.book ?: return
+        val url = currentUrl() ?: return
+        if (_ui.value.finishPending) return
+        _ui.value = _ui.value.copy(finishPending = true, finishError = null)
+        viewModelScope.launch {
+            val result = locator.api.setFinished(url, book.id, finished)
+            val current = _ui.value.book
+            // The listener may have left for another book while this was in flight.
+            if (current?.id != book.id) {
+                _ui.value = _ui.value.copy(finishPending = false)
+                return@launch
+            }
+            when (result) {
+                is ApiResult.Failure -> _ui.value = _ui.value.copy(
+                    finishPending = false,
+                    finishError = result.message,
+                )
+
+                is ApiResult.Ok -> {
+                    val progress = (current.userMediaProgress ?: ItemProgress())
+                        .copy(isFinished = finished)
+                    _ui.value = _ui.value.copy(
+                        finishPending = false,
+                        book = current.copy(userMediaProgress = progress),
+                    )
+                    refreshBook(book.id)
+                }
+            }
+        }
     }
 
     /**
@@ -855,10 +903,14 @@ class AppViewModel(private val locator: ServiceLocator) : ViewModel() {
      * activity's resumed state.
      */
     fun playBook() {
-        val id = _ui.value.book?.id ?: return
+        val book = _ui.value.book ?: return
         _ui.value = _ui.value.copy(route = Route.Player)
         locator.startPlayback()
-        locator.playback.send(PlayCommand.Play(id))
+        // A finished book starts from the beginning, matching its "Play" label.
+        // Its bookmark is wherever it was finished, often the very end, which
+        // would play the last few seconds and stop.
+        val startAtMs = if (book.userMediaProgress?.isFinished == true) 0L else null
+        locator.playback.send(PlayCommand.Play(book.id, startAtMs = startAtMs))
     }
 
     /**
@@ -948,6 +1000,11 @@ class AppViewModel(private val locator: ServiceLocator) : ViewModel() {
     fun setShowCovers(show: Boolean) {
         locator.settings.showCovers = show
         _ui.value = _ui.value.copy(showCovers = show)
+    }
+
+    fun setScrollMode(mode: ScrollMode) {
+        locator.settings.scrollMode = mode
+        _ui.value = _ui.value.copy(scrollMode = mode)
     }
 
     fun setEinkMode(mode: EinkMode) {

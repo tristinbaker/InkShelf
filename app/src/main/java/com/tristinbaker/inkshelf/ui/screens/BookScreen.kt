@@ -24,7 +24,7 @@ import androidx.compose.ui.graphics.ColorFilter
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.unit.dp
 import com.mudita.mmd.components.buttons.OutlinedButtonMMD
-import com.mudita.mmd.components.lazy.LazyColumnMMD
+import com.tristinbaker.inkshelf.ui.components.InkLazyColumn
 import com.mudita.mmd.components.progress_indicator.LinearProgressIndicatorMMD
 import com.mudita.mmd.components.text.TextMMD
 import com.mudita.mmd.components.top_app_bar.TopAppBarMMD
@@ -44,8 +44,6 @@ import com.tristinbaker.inkshelf.ui.components.formatClock
 import com.tristinbaker.inkshelf.ui.components.formatDuration
 import com.tristinbaker.inkshelf.ui.theme.GrayRamp
 
-private const val PAGE_JUMP_STEP = 0
-
 /**
  * Square, to match the artwork rather than crop it. Big enough to read the
  * cover, small enough that the fact list below stays reachable without a long
@@ -58,13 +56,17 @@ private val PLAY_ICON_SIZE = 22.dp
 private val DETAIL_COVER_WIDTH = 220.dp
 private val DETAIL_COVER_HEIGHT = 220.dp
 
-/** Per-book actions: play, resume, download. */
+/** Per-book actions: play, resume, download, mark finished. */
 data class BookActions(
     val resumeLabel: String?,
     val download: DownloadSummary?,
     val onPlay: () -> Unit,
     val onDownload: () -> Unit,
     val onCancelDownload: () -> Unit,
+    val isFinished: Boolean = false,
+    val finishPending: Boolean = false,
+    val finishError: String? = null,
+    val onSetFinished: (Boolean) -> Unit = {},
 )
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -97,9 +99,8 @@ fun BookScreen(
             navigationIcon = { BackButton(onClick = onBack) },
         )
 
-        LazyColumnMMD(
+        InkLazyColumn(
             modifier = Modifier.fillMaxSize(),
-            scrollStep = PAGE_JUMP_STEP,
         ) {
             if (covers != null) {
                 item {
@@ -144,6 +145,7 @@ fun BookScreen(
                         if (trackCount != null && trackCount > 0) {
                             add(if (trackCount == 1) "1 file" else "$trackCount files")
                         }
+                        if (actions.isFinished) add("Finished")
                     }.joinToString(" · ")
                     if (facts.isNotBlank()) {
                         TextMMD(text = facts, color = GrayRamp.g1)
@@ -225,6 +227,41 @@ fun BookScreen(
                     )
                     Spacer(modifier = Modifier.width(8.dp))
                     TextMMD(text = actions.resumeLabel ?: "Play")
+                }
+            }
+
+            // Straight under Play, in the same outline, so the page has one block
+            // of things to do with the book. The state itself reads in the facts
+            // line above ("Finished"); the button only says what a tap will do.
+            // Nothing changes while the write is in flight, neither a "Saving"
+            // label nor a disabled (grey, so dithered) outline: either would cost
+            // the panel an extra redraw per tap. A second tap is dropped instead.
+            item {
+                OutlinedButtonMMD(
+                    onClick = {
+                        if (!actions.finishPending) actions.onSetFinished(!actions.isFinished)
+                    },
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(start = 12.dp, end = 12.dp, bottom = 10.dp),
+                ) {
+                    Image(
+                        painter = painterResource(R.drawable.ic_check),
+                        contentDescription = null,
+                        colorFilter = ColorFilter.tint(LocalContentColor.current),
+                        modifier = Modifier.size(PLAY_ICON_SIZE),
+                    )
+                    Spacer(modifier = Modifier.width(8.dp))
+                    TextMMD(
+                        text = if (actions.isFinished) "Mark as not finished" else "Mark as finished",
+                    )
+                }
+                if (actions.finishError != null) {
+                    TextMMD(
+                        text = actions.finishError,
+                        color = GrayRamp.g0,
+                        modifier = Modifier.padding(start = 12.dp, end = 12.dp, bottom = 10.dp),
+                    )
                 }
             }
 

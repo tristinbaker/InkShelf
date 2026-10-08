@@ -196,6 +196,18 @@ data class ProgressUpdate(
 )
 
 /**
+ * Body for marking a book finished or not from the book page, sent to the same
+ * `PATCH /api/me/progress/:libraryItemId` as [ProgressUpdate].
+ *
+ * Its own type because [ProgressUpdate] cannot express this. It always carries
+ * a position, which would move the bookmark, and `isFinished = false` is its
+ * default, so it is never encoded (`encodeDefaults` is off) and "not finished"
+ * could never reach the server. No default here, so the flag is always sent.
+ */
+@Serializable
+data class FinishedUpdate(val isFinished: Boolean)
+
+/**
  * The listen progress for one item, from the server's `userMediaProgress`.
  *
  * Note the name: `GET /api/items/:id?expanded=1&include=progress` does not return

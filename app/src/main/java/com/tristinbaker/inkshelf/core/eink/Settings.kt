@@ -52,6 +52,12 @@ class Settings(context: Context) {
         get() = prefs.getBoolean(KEY_SHOW_COVERS, true)
         set(value) = prefs.edit().putBoolean(KEY_SHOW_COVERS, value).apply()
 
+    /** Page turns by default: smooth scrolling smears on this panel. */
+    var scrollMode: ScrollMode
+        get() = runCatching { ScrollMode.valueOf(prefs.getString(KEY_SCROLL_MODE, null) ?: "") }
+            .getOrDefault(ScrollMode.PAGE)
+        set(value) = prefs.edit().putString(KEY_SCROLL_MODE, value.name).apply()
+
     /**
      * Book the listener was last playing, so closing the app and coming back
      * lands on its player rather than the library.
@@ -73,5 +79,6 @@ class Settings(context: Context) {
         const val KEY_DOWNLOAD_FOLDER = "download_folder"
         const val KEY_LAST_PLAYED = "last_played_item"
         const val KEY_SHOW_COVERS = "show_covers"
+        const val KEY_SCROLL_MODE = "scroll_mode"
     }
 }

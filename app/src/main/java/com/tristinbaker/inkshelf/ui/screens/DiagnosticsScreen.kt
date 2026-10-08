@@ -11,7 +11,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import com.mudita.mmd.components.buttons.ButtonMMD
-import com.mudita.mmd.components.lazy.LazyColumnMMD
+import com.tristinbaker.inkshelf.ui.components.InkLazyColumn
 import com.mudita.mmd.components.text.TextMMD
 import com.mudita.mmd.components.top_app_bar.TopAppBarMMD
 import com.tristinbaker.inkshelf.ui.components.BackButton
@@ -20,8 +20,6 @@ import com.tristinbaker.inkshelf.core.eink.MeinkBinder
 import com.tristinbaker.inkshelf.ui.components.Gap
 import com.tristinbaker.inkshelf.ui.components.SectionHeader
 import com.tristinbaker.inkshelf.ui.theme.GrayRamp
-
-private const val PAGE_JUMP_STEP = 0
 
 /**
  * Built specifically for the case where the e-ink work is unverified: there is
@@ -48,7 +46,7 @@ fun DiagnosticsScreen(
             navigationIcon = { BackButton(onClick = onBack) },
         )
 
-        LazyColumnMMD(modifier = Modifier.fillMaxSize(), scrollStep = PAGE_JUMP_STEP) {
+        InkLazyColumn(modifier = Modifier.fillMaxSize()) {
             item { SectionHeader("E-ink service") }
             item { Field("Service found", if (einkAvailable) "yes" else "no") }
             item { Field("Service name", MeinkBinder.SERVICE_NAME) }

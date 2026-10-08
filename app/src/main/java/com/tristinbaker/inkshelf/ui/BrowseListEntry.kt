@@ -41,3 +41,11 @@ fun <T> letterSegments(
     }
     return out
 }
+
+/**
+ * Where each section bar sits in the lazy list, for jumping between letters.
+ * [leadingItems] counts whatever the list emits ahead of the first entry, so the
+ * positions line up with the list's own item indices.
+ */
+fun List<BrowseListEntry>.headerIndices(leadingItems: Int = 0): List<Int> =
+    indices.filter { this[it] is BrowseListEntry.Header }.map { it + leadingItems }

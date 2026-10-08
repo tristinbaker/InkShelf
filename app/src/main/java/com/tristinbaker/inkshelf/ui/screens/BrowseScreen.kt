@@ -15,7 +15,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.mudita.mmd.components.buttons.ButtonDefaultsMMD
 import com.mudita.mmd.components.buttons.ButtonMMD
-import com.mudita.mmd.components.lazy.LazyColumnMMD
+import com.tristinbaker.inkshelf.ui.components.InkLazyColumn
 import com.mudita.mmd.components.progress_indicator.CircularProgressIndicatorMMD
 import com.mudita.mmd.components.text.TextMMD
 import com.mudita.mmd.components.top_app_bar.TopAppBarMMD
@@ -26,6 +26,7 @@ import com.tristinbaker.inkshelf.data.Sorters
 import com.tristinbaker.inkshelf.ui.AuthorRow
 import com.tristinbaker.inkshelf.ui.BrowseListEntry
 import com.tristinbaker.inkshelf.ui.BrowseState
+import com.tristinbaker.inkshelf.ui.headerIndices
 import com.tristinbaker.inkshelf.ui.letterSegments
 import com.tristinbaker.inkshelf.ui.SeriesRow
 import com.tristinbaker.inkshelf.cover.CoverStore
@@ -41,13 +42,7 @@ import com.tristinbaker.inkshelf.ui.components.formatDuration
 import com.tristinbaker.inkshelf.ui.theme.GrayRamp
 import androidx.compose.foundation.lazy.LazyListState
 import androidx.compose.runtime.Composable
-
-/**
- * `scrollStep = 0` makes the list jump whole pages instead of pixel-scrolling,
- * which is the difference between a usable and an unusable experience on this
- * panel: a slow partial refresh of a half-scrolled list is a smear.
- */
-private const val PAGE_JUMP_STEP = 0
+import androidx.compose.runtime.remember
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -137,16 +132,26 @@ fun BrowseScreen(
             )
         }
 
-        LazyColumnMMD(
+        // Built ahead of the list rather than inside it so the scrollbar can be
+        // told where the letter bars are: a long press on its arrows jumps
+        // between them.
+        val segments = remember(browse.order, browse.items, browse.authors, browse.series) {
+            when (browse.order) {
+                BrowseOrder.TITLE -> letterSegments(browse.items) { Sorters.titleLetterBucket(it.title) }
+                BrowseOrder.AUTHOR -> letterSegments(browse.authors) { Sorters.lastNameLetterBucket(it.name) }
+                BrowseOrder.SERIES -> letterSegments(browse.series) { Sorters.nameLetterBucket(it.name) }
+            }
+        }
+        // Series opens with its count header, one item ahead of the first bar.
+        val leadingItems = if (browse.order == BrowseOrder.SERIES) 1 else 0
+
+        InkLazyColumn(
             modifier = Modifier.fillMaxSize(),
             state = listState,
-            scrollStep = PAGE_JUMP_STEP,
+            sectionStarts = remember(segments, leadingItems) { segments.headerIndices(leadingItems) },
         ) {
             when (browse.order) {
                 BrowseOrder.TITLE -> {
-                    val segments = letterSegments(browse.items) {
-                        Sorters.titleLetterBucket(it.title)
-                    }
                     segments.forEach { segment ->
                         when (segment) {
                             is BrowseListEntry.Header ->
@@ -181,9 +186,6 @@ fun BrowseScreen(
                 }
 
                 BrowseOrder.AUTHOR -> {
-                    val segments = letterSegments(browse.authors) {
-                        Sorters.lastNameLetterBucket(it.name)
-                    }
                     segments.forEach { segment ->
                         when (segment) {
                             is BrowseListEntry.Header ->
@@ -205,9 +207,6 @@ fun BrowseScreen(
 
                 BrowseOrder.SERIES -> {
                     item { SectionHeader("${browse.series.size} series") }
-                    val segments = letterSegments(browse.series) {
-                        Sorters.nameLetterBucket(it.name)
-                    }
                     segments.forEach { segment ->
                         when (segment) {
                             is BrowseListEntry.Header ->

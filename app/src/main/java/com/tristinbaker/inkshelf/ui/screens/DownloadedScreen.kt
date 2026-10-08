@@ -10,7 +10,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import com.mudita.mmd.components.buttons.ButtonMMD
-import com.mudita.mmd.components.lazy.LazyColumnMMD
+import com.tristinbaker.inkshelf.ui.components.InkLazyColumn
 import com.mudita.mmd.components.text.TextMMD
 import com.mudita.mmd.components.top_app_bar.TopAppBarMMD
 import com.tristinbaker.inkshelf.ui.components.BackButton
@@ -20,8 +20,6 @@ import com.tristinbaker.inkshelf.ui.components.formatDuration
 import com.tristinbaker.inkshelf.ui.components.InkRow
 import com.tristinbaker.inkshelf.ui.components.SectionHeader
 import com.tristinbaker.inkshelf.ui.theme.GrayRamp
-
-private const val PAGE_JUMP_STEP = 0
 
 /**
  * Books whose files are on the device, listed from the local cache so this screen
@@ -53,9 +51,8 @@ fun DownloadedScreen(
             return@Column
         }
 
-        LazyColumnMMD(
+        InkLazyColumn(
             modifier = Modifier.fillMaxSize(),
-            scrollStep = PAGE_JUMP_STEP,
         ) {
             item { SectionHeader("On this device") }
             items(books.size) { index ->

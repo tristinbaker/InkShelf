@@ -24,7 +24,7 @@ import androidx.compose.ui.unit.min
 import androidx.compose.ui.unit.sp
 import com.mudita.mmd.components.buttons.ButtonMMD
 import com.mudita.mmd.components.buttons.OutlinedButtonMMD
-import com.mudita.mmd.components.lazy.LazyColumnMMD
+import com.tristinbaker.inkshelf.ui.components.InkLazyColumn
 import com.mudita.mmd.components.slider.SliderMMD
 import com.mudita.mmd.components.text.TextMMD
 import com.mudita.mmd.components.top_app_bar.TopAppBarMMD
@@ -41,8 +41,6 @@ import com.tristinbaker.inkshelf.ui.components.formatSpeed
 import com.tristinbaker.inkshelf.ui.theme.GrayRamp
 
 private const val SKIP_MS = 30_000L
-private const val PAGE_JUMP_STEP = 0
-
 /** Larger than the 20sp body default, so the book reads as the headline. */
 private val TITLE_SP = 24.sp
 
@@ -90,9 +88,8 @@ fun PlayerScreen(
                 navigationIcon = { BackButton(onClick = onBack) },
             )
 
-            LazyColumnMMD(
+            InkLazyColumn(
                 modifier = Modifier.fillMaxSize(),
-                scrollStep = PAGE_JUMP_STEP,
             ) {
                 // Everything above the chapter list is one item exactly one
                 // viewport tall, so at the top of the page the chapters start

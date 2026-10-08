@@ -10,7 +10,7 @@ import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import com.mudita.mmd.components.buttons.ButtonMMD
-import com.mudita.mmd.components.lazy.LazyColumnMMD
+import com.tristinbaker.inkshelf.ui.components.InkLazyColumn
 import com.mudita.mmd.components.progress_indicator.CircularProgressIndicatorMMD
 import com.mudita.mmd.components.text.TextMMD
 import com.mudita.mmd.components.top_app_bar.TopAppBarMMD
@@ -24,8 +24,6 @@ import com.tristinbaker.inkshelf.ui.components.Gap
 import com.tristinbaker.inkshelf.ui.components.formatDuration
 import com.tristinbaker.inkshelf.ui.components.InkRow
 import com.tristinbaker.inkshelf.ui.theme.GrayRamp
-
-private const val PAGE_JUMP_STEP = 0
 
 /** Books inside a series or by an author. */
 @OptIn(ExperimentalMaterial3Api::class)
@@ -81,9 +79,8 @@ fun ItemsScreen(
             return@Column
         }
 
-        LazyColumnMMD(
+        InkLazyColumn(
             modifier = Modifier.fillMaxSize(),
-            scrollStep = PAGE_JUMP_STEP,
         ) {
             items(items.size) { index ->
                 val item = items[index]

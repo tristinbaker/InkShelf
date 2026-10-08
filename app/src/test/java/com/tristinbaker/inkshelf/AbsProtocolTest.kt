@@ -2,6 +2,7 @@ package com.tristinbaker.inkshelf
 
 import com.tristinbaker.inkshelf.core.abs.AuthorEntry
 import com.tristinbaker.inkshelf.core.abs.FilterGroup
+import com.tristinbaker.inkshelf.core.abs.FinishedUpdate
 import com.tristinbaker.inkshelf.core.abs.LibraryItem
 import com.tristinbaker.inkshelf.core.abs.ListEnvelope
 import com.tristinbaker.inkshelf.core.abs.buildFilter
@@ -43,6 +44,29 @@ class FiltersTest {
     @Test
     fun `encodes name-based groups the same way`() {
         assertEquals("tags.RmFuY3k=", buildFilter(FilterGroup.TAGS, "Fancy"))
+    }
+}
+
+class FinishedUpdateTest {
+
+    /**
+     * `encodeDefaults` is off, so a `false` that matched a default would be left
+     * out of the body and "Mark as not finished" would PATCH nothing at all.
+     */
+    @Test
+    fun `sends not finished explicitly`() {
+        assertEquals(
+            """{"isFinished":false}""",
+            AbsJson.json.encodeToString(FinishedUpdate.serializer(), FinishedUpdate(false)),
+        )
+    }
+
+    @Test
+    fun `carries no position, so the bookmark is left alone`() {
+        assertEquals(
+            """{"isFinished":true}""",
+            AbsJson.json.encodeToString(FinishedUpdate.serializer(), FinishedUpdate(true)),
+        )
     }
 }
 

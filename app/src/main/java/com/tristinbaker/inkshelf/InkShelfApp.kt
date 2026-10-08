@@ -6,6 +6,7 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.material3.Surface
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.foundation.lazy.LazyListState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateMapOf
@@ -23,6 +24,7 @@ import com.tristinbaker.inkshelf.ui.screens.DownloadedScreen
 import com.tristinbaker.inkshelf.ui.screens.ItemsScreen
 import com.tristinbaker.inkshelf.ui.screens.LoginScreen
 import com.tristinbaker.inkshelf.ui.screens.PlayerScreen
+import com.tristinbaker.inkshelf.ui.components.LocalScrollMode
 import com.tristinbaker.inkshelf.ui.components.MiniPlayerBar
 import com.tristinbaker.inkshelf.ui.components.formatClock
 import com.tristinbaker.inkshelf.ui.screens.SettingsScreen
@@ -39,6 +41,7 @@ fun InkShelfApp(
     val state by viewModel.ui.collectAsStateWithLifecycle()
 
     InkShelfTheme {
+    CompositionLocalProvider(LocalScrollMode provides state.scrollMode) {
         Surface(
             modifier = Modifier.fillMaxSize(),
             color = GrayRamp.g4,
@@ -133,13 +136,21 @@ fun InkShelfApp(
                         covers = locator.covers,
                         chapters = book?.media?.chapters.orEmpty(),
                         actions = BookActions(
-                            resumeLabel = book?.userMediaProgress?.currentTime
+                            // A finished book starts over, so it gets plain "Play"
+                            // rather than an offer to resume at the very end.
+                            resumeLabel = book?.userMediaProgress
+                                ?.takeIf { it.isFinished != true }
+                                ?.currentTime
                                 ?.takeIf { it > 0 }
                                 ?.let { "Resume · ${formatClock((it * 1000).toLong())}" },
                             download = state.downloads[route.itemId],
                             onPlay = viewModel::playBook,
                             onDownload = viewModel::downloadBook,
                             onCancelDownload = viewModel::removeDownload,
+                            isFinished = book?.userMediaProgress?.isFinished == true,
+                            finishPending = state.finishPending,
+                            finishError = state.finishError,
+                            onSetFinished = viewModel::setFinished,
                         ),
                         onPlayChapter = viewModel::playChapterAt,
                         onBack = viewModel::backFromBook,
@@ -169,8 +180,10 @@ fun InkShelfApp(
                     serverUrl = state.session?.serverUrl ?: "",
                     username = state.session?.username ?: "",
                     showCovers = state.showCovers,
+                    scrollMode = state.scrollMode,
                     onEinkMode = viewModel::setEinkMode,
                     onShowCovers = viewModel::setShowCovers,
+                    onScrollMode = viewModel::setScrollMode,
                     onPickDownloadFolder = pickDownloadFolder,
                     onResetDownloadFolder = viewModel::resetDownloadFolder,
                     onFullRefresh = viewModel::fullRefresh,
@@ -211,5 +224,6 @@ fun InkShelfApp(
             }
             }
         }
+    }
     }
 }

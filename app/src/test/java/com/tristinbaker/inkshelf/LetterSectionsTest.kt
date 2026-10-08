@@ -2,6 +2,8 @@ package com.tristinbaker.inkshelf
 
 import com.tristinbaker.inkshelf.data.Sorters
 import com.tristinbaker.inkshelf.ui.BrowseListEntry
+import com.tristinbaker.inkshelf.ui.components.sectionTarget
+import com.tristinbaker.inkshelf.ui.headerIndices
 import com.tristinbaker.inkshelf.ui.letterSegments
 import org.junit.Assert.assertEquals
 import org.junit.Test
@@ -115,5 +117,52 @@ class LetterSectionsTest {
         val rows = segments.filterIsInstance<BrowseListEntry.Row>().map { it.index }
 
         assertEquals((0 until titles.size).toList(), rows)
+    }
+}
+
+class SectionJumpTest {
+
+    // Bars at 0 (A), 5 (B), 12 (C) in a 20-item list.
+    private val starts = listOf(0, 5, 12)
+
+    private fun jump(first: Int, forward: Boolean, offset: Int = 0) =
+        sectionTarget(starts, first, offset, lastIndex = 19, forward = forward)
+
+    @Test
+    fun `down goes to the next bar`() {
+        assertEquals(5, jump(first = 2, forward = true))
+        assertEquals(12, jump(first = 5, forward = true))
+    }
+
+    @Test
+    fun `down past the last bar goes to the end`() {
+        assertEquals(19, jump(first = 14, forward = true))
+    }
+
+    @Test
+    fun `up from inside a section goes to its own bar first`() {
+        assertEquals(5, jump(first = 8, forward = false))
+    }
+
+    @Test
+    fun `up from exactly on a bar goes to the one before`() {
+        assertEquals(5, jump(first = 12, forward = false))
+    }
+
+    @Test
+    fun `up from a bar scrolled partly off the top goes back to that bar`() {
+        assertEquals(12, jump(first = 12, forward = false, offset = 30))
+    }
+
+    @Test
+    fun `lists with no bars jump to the ends`() {
+        assertEquals(0, sectionTarget(emptyList(), 7, 0, lastIndex = 19, forward = false))
+        assertEquals(19, sectionTarget(emptyList(), 7, 0, lastIndex = 19, forward = true))
+    }
+
+    @Test
+    fun `header positions skip whatever comes before the first bar`() {
+        val segments = letterSegments(listOf("Apple", "Avocado", "Banana")) { it.take(1) }
+        assertEquals(listOf(1, 4), segments.headerIndices(leadingItems = 1))
     }
 }

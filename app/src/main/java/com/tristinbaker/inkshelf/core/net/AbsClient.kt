@@ -3,6 +3,7 @@ package com.tristinbaker.inkshelf.core.net
 import android.util.Log
 import com.tristinbaker.inkshelf.core.abs.AuthorEntry
 import com.tristinbaker.inkshelf.core.abs.AuthorSort
+import com.tristinbaker.inkshelf.core.abs.FinishedUpdate
 import com.tristinbaker.inkshelf.core.abs.LibrariesResponse
 import com.tristinbaker.inkshelf.core.abs.Library
 import com.tristinbaker.inkshelf.core.abs.LibraryItem
@@ -215,6 +216,23 @@ class AbsClient(
         fetch = { page -> series(url, libraryId, descending, PAGE_SIZE, page) },
     )
 
+    /**
+     * Every item matching [filter], paging until the server says it is done.
+     *
+     * A single [items] call is one page of [PAGE_SIZE]. The browse list used to
+     * make exactly one, so a library past 200 books stopped partway through the
+     * alphabet with nothing to say the rest existed.
+     */
+    suspend fun allItems(
+        url: ServerUrl,
+        libraryId: String,
+        sort: String,
+        descending: Boolean,
+        filter: String? = null,
+    ): ApiResult<List<LibraryItem>> = paged(
+        fetch = { page -> items(url, libraryId, sort, descending, filter, PAGE_SIZE, page) },
+    )
+
     suspend fun allAuthors(
         url: ServerUrl,
         libraryId: String,
@@ -312,6 +330,33 @@ class AbsClient(
         return when (raw) {
             is ApiResult.Failure -> raw
             // 200 with an empty body; the endpoint uses sendStatus(200).
+            is ApiResult.Ok -> ApiResult.Ok(Unit)
+        }
+    }
+
+    /**
+     * Marks a book finished, or not, leaving its bookmark where it is.
+     *
+     * Unlike [updateProgress] this is a tap the user waits on, so a stale token
+     * is refreshed and the write retried once rather than the failure shown.
+     */
+    suspend fun setFinished(url: ServerUrl, itemId: String, finished: Boolean): ApiResult<Unit> {
+        val body = AbsJson.json.encodeToString(FinishedUpdate.serializer(), FinishedUpdate(finished))
+        val send = suspend {
+            execute(url, "PATCH", "/api/me/progress/$itemId", body = body, authorized = true)
+        }
+        var raw = send()
+        if (raw is ApiResult.Failure && raw.kind == ApiResult.Failure.Kind.Unauthorized) {
+            if (!refresh(url)) {
+                return ApiResult.Failure(
+                    "Session expired, please sign in again",
+                    ApiResult.Failure.Kind.Unauthorized,
+                )
+            }
+            raw = send()
+        }
+        return when (raw) {
+            is ApiResult.Failure -> raw
             is ApiResult.Ok -> ApiResult.Ok(Unit)
         }
     }
