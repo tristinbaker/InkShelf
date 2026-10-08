@@ -1,6 +1,8 @@
 package com.tristinbaker.inkshelf.ui.screens
 
 import androidx.compose.foundation.BorderStroke
+import androidx.compose.foundation.Image
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -9,9 +11,13 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
+import androidx.compose.material3.LocalContentColor
 import androidx.compose.material3.ButtonColors
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.ColorFilter
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.mudita.mmd.components.buttons.ButtonDefaultsMMD
@@ -20,6 +26,7 @@ import com.tristinbaker.inkshelf.ui.components.InkLazyColumn
 import com.mudita.mmd.components.progress_indicator.CircularProgressIndicatorMMD
 import com.mudita.mmd.components.text.TextMMD
 import com.mudita.mmd.components.top_app_bar.TopAppBarMMD
+import com.tristinbaker.inkshelf.R
 import com.tristinbaker.inkshelf.core.abs.BrowseOrder
 import com.tristinbaker.inkshelf.data.ItemEntity
 import com.tristinbaker.inkshelf.data.LibraryEntity
@@ -77,7 +84,16 @@ fun BrowseScreen(
     // The caller owns one state per tab and hands back the matching one.
     Column(modifier = Modifier.fillMaxSize()) {
         TopAppBarMMD(
-            title = { TextMMD(text = selectedLibrary?.name ?: "InkShelf") },
+            title = {
+                LibraryTitle(
+                    libraries = libraries,
+                    selected = selectedLibrary,
+                    // Not while a series or author is open, which is when the
+                    // rest of the bars below are hidden too.
+                    enabled = browse.filterLabel == null,
+                    onSelect = onSelectLibrary,
+                )
+            },
             actions = {
                 if (downloadedCount > 0) {
                     DownloadsButton(
@@ -97,12 +113,6 @@ fun BrowseScreen(
         )
 
         if (browse.filterLabel != null) return@Column
-
-        LibraryBar(
-            libraries = libraries,
-            selected = selectedLibrary,
-            onSelect = onSelectLibrary,
-        )
 
         if (browse.loading) {
             Column(
@@ -312,35 +322,47 @@ private fun OrderBar(
     }
 }
 
+/**
+ * The library name in the top bar, which opens a menu of the others when there
+ * is more than one. It used to be a row of buttons under the order bar, but
+ * that ran out of width at four libraries and repeated the title besides.
+ */
 @Composable
-private fun LibraryBar(
+private fun LibraryTitle(
     libraries: List<LibraryEntity>,
     selected: LibraryEntity?,
+    enabled: Boolean,
     onSelect: (LibraryEntity) -> Unit,
 ) {
-    if (libraries.size <= 1) return
+    val name = selected?.name ?: "InkShelf"
+    if (libraries.size <= 1 || !enabled) {
+        TextMMD(text = name, maxLines = 1, overflow = TextOverflow.Ellipsis)
+        return
+    }
 
     var expanded by remember { mutableStateOf(false) }
 
-    Box(
-        modifier = Modifier.fillMaxWidth().padding(horizontal = 8.dp)
-    ) {
-        ButtonMMD(
-            onClick = { expanded = true },
-            modifier = Modifier.fillMaxWidth()
+    Box {
+        Row(
+            modifier = Modifier.clickable { expanded = true },
+            verticalAlignment = Alignment.CenterVertically,
         ) {
             TextMMD(
-                text = selected?.name ?: "InkShelf",
+                text = name,
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis,
+                modifier = Modifier.weight(1f, fill = false),
+            )
+            Image(
+                painter = painterResource(R.drawable.ic_dropdown),
+                contentDescription = "Choose library",
+                colorFilter = ColorFilter.tint(LocalContentColor.current),
+                modifier = Modifier.size(24.dp),
             )
         }
         DropdownMenuMMD(
-            expanded,
-            onDismissRequest = {
-                expanded = false
-            },
-            modifier = Modifier.fillMaxWidth()
+            expanded = expanded,
+            onDismissRequest = { expanded = false },
         ) {
             libraries.forEach { library ->
                 DropdownMenuItemMMD(
@@ -348,13 +370,25 @@ private fun LibraryBar(
                         TextMMD(
                             text = library.name,
                             maxLines = 1,
-                            overflow = TextOverflow.Ellipsis
+                            overflow = TextOverflow.Ellipsis,
                         )
                     },
                     onClick = {
-                        onSelect(library)
                         expanded = false
-                    }
+                        if (library.id != selected?.id) onSelect(library)
+                    },
+                    trailingIcon = if (library.id == selected?.id) {
+                        {
+                            Image(
+                                painter = painterResource(R.drawable.ic_check),
+                                contentDescription = "Current library",
+                                colorFilter = ColorFilter.tint(LocalContentColor.current),
+                                modifier = Modifier.size(24.dp),
+                            )
+                        }
+                    } else {
+                        null
+                    },
                 )
             }
         }
